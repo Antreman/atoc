@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Elevator Controller FSM Demo</title>
+  <title>ATM PIN Attempts FSM Demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     * {
@@ -17,7 +17,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #e5f4ff;
+      background: #e0f2fe; /* light blue */
       color: #0f172a;
     }
 
@@ -27,7 +27,7 @@
       padding: 20px 22px 22px;
       border: 1px solid #cbd5e1;
       box-shadow: 0 14px 40px rgba(15, 23, 42, 0.12);
-      max-width: 640px;
+      max-width: 420px;
       width: 100%;
     }
 
@@ -43,87 +43,9 @@
       margin-bottom: 16px;
     }
 
-    .layout {
-      display: flex;
-      gap: 20px;
-      align-items: stretch;
-      justify-content: space-between;
-      flex-wrap: wrap;
-    }
-
-    /* Building / elevator shaft */
-    .building {
-      background: #0f172a;
-      border-radius: 14px;
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column-reverse;
-      gap: 8px;
-      width: 180px;
-    }
-
-    .floor {
-      background: #020617;
-      border-radius: 10px;
-      padding: 6px 8px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border: 1px solid transparent;
-      transition: border 0.15s, background 0.15s;
-      color: #e5e7eb;
-      font-size: 0.8rem;
-    }
-
-    .floor-label {
-      opacity: 0.8;
-    }
-
-    .car {
-      font-size: 0.85rem;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .door {
-      padding: 1px 6px;
-      border-radius: 999px;
-      font-size: 0.7rem;
-      background: #1f2937;
-    }
-
-    .floor.current {
-      border-color: #38bdf8;
-      background: #0b1120;
-    }
-
-    .floor.current .floor-label {
-      font-weight: 600;
-      opacity: 1;
-    }
-
-    .door.open {
-      background: #22c55e;
-      color: #052e16;
-    }
-
-    .door.closed {
-      background: #ef4444;
-      color: #450a0a;
-    }
-
-    /* Controls */
-    .side-panel {
-      flex: 1;
-      min-width: 240px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .state-label {
+    .state-row {
       font-size: 0.9rem;
+      margin-bottom: 8px;
     }
 
     .state-pill {
@@ -142,24 +64,45 @@
       margin-left: 2px;
     }
 
-    .dir-label {
+    .attempts {
       font-size: 0.8rem;
       color: #64748b;
+      margin-bottom: 10px;
     }
 
-    .buttons-grid {
+    .pin-display {
+      margin-bottom: 10px;
+    }
+
+    .pin-input {
+      width: 100%;
+      text-align: center;
+      letter-spacing: 4px;
+      font-size: 1.2rem;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #94a3b8;
+      outline: none;
+      background: #f8fafc;
+    }
+
+    .pin-input:disabled {
+      background: #e5e7eb;
+      color: #6b7280;
+    }
+
+    .keypad {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 6px;
-      margin-top: 4px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     button {
       border: none;
       border-radius: 999px;
-      padding: 6px 0;
-      font-size: 0.9rem;
+      padding: 8px 0;
+      font-size: 0.95rem;
       cursor: pointer;
       background: #2563eb;
       color: white;
@@ -177,14 +120,21 @@
       box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
     }
 
-    .reset-btn {
-      margin-top: 4px;
+    .btn-secondary {
       background: #0f172a;
-      box-shadow: 0 6px 14px rgba(15, 23, 42, 0.4);
+      box-shadow: 0 6px 14px rgba(15, 23, 42, 0.5);
       font-size: 0.8rem;
-      padding-inline: 10px;
-      justify-self: flex-start;
-      width: auto;
+    }
+
+    .btn-danger {
+      background: #dc2626;
+      box-shadow: 0 6px 14px rgba(220, 38, 38, 0.5);
+    }
+
+    .bottom-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
     }
 
     .status {
@@ -193,9 +143,12 @@
       min-height: 1.3em;
     }
 
-    .queue {
-      font-size: 0.8rem;
-      color: #475569;
+    .status.ok {
+      color: #16a34a;
+    }
+
+    .status.error {
+      color: #dc2626;
     }
 
     .fsm-info {
@@ -217,275 +170,238 @@
 </head>
 <body>
   <div class="card">
-    <div class="title">Elevator Controller (Finite State Machine)</div>
+    <div class="title">ATM PIN Attempt System</div>
     <div class="subtitle">
-      States: Idle → Moving Up → Door Open → Idle, and Idle → Moving Down → Door Open → Idle, based on floor requests.
+      Finite State Machine with limited tries: Try0 → Try1 → Try2 → Locked.
     </div>
 
-    <div class="layout">
-      <!-- Building view -->
-      <div class="building" id="building">
-        <!-- Floors 5 to 1 (created via JS or you can hard-code) -->
-        <div class="floor" data-floor="5">
-          <span class="floor-label">Floor 5</span>
-          <span class="car">
-            🚪 <span class="door closed">Closed</span>
-          </span>
-        </div>
-        <div class="floor" data-floor="4">
-          <span class="floor-label">Floor 4</span>
-          <span class="car">
-            🚪 <span class="door closed">Closed</span>
-          </span>
-        </div>
-        <div class="floor" data-floor="3">
-          <span class="floor-label">Floor 3</span>
-          <span class="car">
-            🚪 <span class="door closed">Closed</span>
-          </span>
-        </div>
-        <div class="floor" data-floor="2">
-          <span class="floor-label">Floor 2</span>
-          <span class="car">
-            🚪 <span class="door closed">Closed</span>
-          </span>
-        </div>
-        <div class="floor" data-floor="1">
-          <span class="floor-label">Floor 1</span>
-          <span class="car">
-            🚪 <span class="door closed">Closed</span>
-          </span>
-        </div>
-      </div>
+    <div class="state-row">
+      FSM state:
+      <span class="state-pill">
+        <span id="state-name">TRY0</span>
+        &nbsp;(<span id="state-id">q0</span>)
+      </span>
+    </div>
+    <div class="attempts">
+      Attempts used: <strong id="attempts-used">0</strong> / 3
+      &nbsp;| Remaining: <strong id="attempts-left">3</strong>
+    </div>
 
-      <!-- Controls / FSM info -->
-      <div class="side-panel">
-        <div class="state-label">
-          FSM state:
-          <span class="state-pill">
-            <span id="state-name">IDLE</span>
-            &nbsp;(<span id="state-id">q0</span>)
-          </span>
-        </div>
-        <div class="dir-label">
-          Current floor: <strong id="current-floor">1</strong>
-          &nbsp;| Direction: <span id="direction-text">None</span>
-        </div>
+    <div class="pin-display">
+      <input
+        id="pin-input"
+        class="pin-input"
+        type="password"
+        maxlength="4"
+        placeholder="••••"
+        readonly
+      />
+    </div>
 
-        <div class="buttons-grid" id="floor-buttons">
-          <!-- Floor buttons 1–5 -->
-          <button data-floor="1">1</button>
-          <button data-floor="2">2</button>
-          <button data-floor="3">3</button>
-          <button data-floor="4">4</button>
-          <button data-floor="5">5</button>
-        </div>
+    <div class="keypad" id="keypad">
+      <!-- digits 1–9 -->
+      <button data-digit="1">1</button>
+      <button data-digit="2">2</button>
+      <button data-digit="3">3</button>
+      <button data-digit="4">4</button>
+      <button data-digit="5">5</button>
+      <button data-digit="6">6</button>
+      <button data-digit="7">7</button>
+      <button data-digit="8">8</button>
+      <button data-digit="9">9</button>
+      <!-- 0 in center bottom -->
+      <div></div>
+      <button data-digit="0">0</button>
+      <div></div>
+    </div>
 
-        <button class="reset-btn" id="resetBtn">Reset Elevator</button>
+    <div class="bottom-row">
+      <button id="clearBtn" class="btn-secondary" style="flex:1;">Clear</button>
+      <button id="submitBtn" style="flex:2;">Enter</button>
+      <button id="resetBtn" class="btn-danger btn-secondary" style="flex:1;">Reset</button>
+    </div>
 
-        <div class="status" id="status">
-          Elevator idle at Floor 1. Press a floor button to request.
-        </div>
-        <div class="queue" id="queue-view">
-          Queue: [ ] 
-        </div>
+    <div class="status" id="status">
+      Enter 4-digit PIN using keypad.
+    </div>
 
-        <div class="fsm-info">
-          States: <code>{IDLE (q0), MOVING_UP (q1), MOVING_DOWN (q2), DOOR_OPEN (q3)}</code><br />
-          Inputs: <code>{floorRequest, reachedTarget, doorTimer}</code><br />
-          Example transitions:<br />
-          <code>IDLE + request above → MOVING_UP</code><br />
-          <code>IDLE + request below → MOVING_DOWN</code><br />
-          <code>MOVING_* + reachedTarget → DOOR_OPEN</code><br />
-          <code>DOOR_OPEN + timer → IDLE or next MOVING_* (if more requests)</code>
-        </div>
-      </div>
+    <div class="fsm-info">
+      States: <code>{TRY0 (q0), TRY1 (q1), TRY2 (q2), LOCKED (q3)}</code><br />
+      Inputs: <code>{correctPIN, wrongPIN}</code><br />
+      Transitions:<br />
+      <code>TRY0 --wrongPIN--> TRY1</code><br />
+      <code>TRY1 --wrongPIN--> TRY2</code><br />
+      <code>TRY2 --wrongPIN--> LOCKED</code><br />
+      Any state + <code>correctPIN</code> → “Access Granted” (no further transitions).
     </div>
   </div>
 
   <script>
-    // FSM STATES
-    const IDLE = "IDLE";
-    const MOVING_UP = "MOVING_UP";
-    const MOVING_DOWN = "MOVING_DOWN";
-    const DOOR_OPEN = "DOOR_OPEN";
+    // FSM STATE CONSTANTS
+    const TRY0 = "TRY0";
+    const TRY1 = "TRY1";
+    const TRY2 = "TRY2";
+    const LOCKED = "LOCKED";
 
-    let state = IDLE;
-    let currentFloor = 1;
-    let requestQueue = []; // FIFO list of requested floors
-    let moveTimer = null;
-    let doorTimer = null;
+    const CORRECT_PIN = "1234"; // hard-coded for demo
 
-    const floors = Array.from(document.querySelectorAll(".floor"));
+    let attemptsUsed = 0;
+    let currentState = TRY0;
+    let currentPIN = "";
+
     const stateNameSpan = document.getElementById("state-name");
     const stateIdSpan = document.getElementById("state-id");
-    const directionText = document.getElementById("direction-text");
-    const currentFloorSpan = document.getElementById("current-floor");
+    const attemptsUsedSpan = document.getElementById("attempts-used");
+    const attemptsLeftSpan = document.getElementById("attempts-left");
+    const pinInput = document.getElementById("pin-input");
     const statusDiv = document.getElementById("status");
-    const queueView = document.getElementById("queue-view");
-    const floorButtonsContainer = document.getElementById("floor-buttons");
+    const keypad = document.getElementById("keypad");
+    const clearBtn = document.getElementById("clearBtn");
+    const submitBtn = document.getElementById("submitBtn");
     const resetBtn = document.getElementById("resetBtn");
 
     function setState(newState) {
-      state = newState;
+      currentState = newState;
       stateNameSpan.textContent = newState;
-
-      let id;
-      switch (newState) {
-        case IDLE: id = "q0"; break;
-        case MOVING_UP: id = "q1"; break;
-        case MOVING_DOWN: id = "q2"; break;
-        case DOOR_OPEN: id = "q3"; break;
-        default: id = "?";
-      }
+      let id = "q0";
+      if (newState === TRY1) id = "q1";
+      else if (newState === TRY2) id = "q2";
+      else if (newState === LOCKED) id = "q3";
       stateIdSpan.textContent = id;
-
-      if (newState === IDLE) {
-        directionText.textContent = "None";
-      } else if (newState === MOVING_UP) {
-        directionText.textContent = "Up ↑";
-      } else if (newState === MOVING_DOWN) {
-        directionText.textContent = "Down ↓";
-      } else if (newState === DOOR_OPEN) {
-        directionText.textContent = "Stopped";
-      }
     }
 
-    function updateBuildingView(doorIsOpen) {
-      floors.forEach(floor => {
-        const floorNum = parseInt(floor.dataset.floor, 10);
-        const doorSpan = floor.querySelector(".door");
-        floor.classList.toggle("current", floorNum === currentFloor);
+    function updateAttemptsView() {
+      attemptsUsedSpan.textContent = attemptsUsed;
+      attemptsLeftSpan.textContent = Math.max(0, 3 - attemptsUsed);
+    }
 
-        if (doorSpan) {
-          if (floorNum === currentFloor && doorIsOpen) {
-            doorSpan.textContent = "Open";
-            doorSpan.classList.add("open");
-            doorSpan.classList.remove("closed");
-          } else {
-            doorSpan.textContent = "Closed";
-            doorSpan.classList.add("closed");
-            doorSpan.classList.remove("open");
-          }
-        }
+    function setStatus(msg, type = "") {
+      statusDiv.textContent = msg;
+      statusDiv.classList.remove("ok", "error");
+      if (type === "ok") statusDiv.classList.add("ok");
+      if (type === "error") statusDiv.classList.add("error");
+    }
+
+    function updateInputDisplay() {
+      pinInput.value = currentPIN;
+    }
+
+    function isLocked() {
+      return currentState === LOCKED;
+    }
+
+    function handleDigit(digit) {
+      if (isLocked()) {
+        setStatus("Card blocked. Please contact bank.", "error");
+        return;
+      }
+      if (currentPIN.length >= 4) return;
+      currentPIN += digit;
+      updateInputDisplay();
+    }
+
+    function clearPIN() {
+      if (isLocked()) return;
+      currentPIN = "";
+      updateInputDisplay();
+      setStatus("Cleared. Enter PIN again.");
+    }
+
+    function evaluatePIN() {
+      if (isLocked()) {
+        setStatus("Card already blocked. No more attempts.", "error");
+        return;
+      }
+
+      if (currentPIN.length !== 4) {
+        setStatus("Enter a 4-digit PIN before pressing Enter.", "error");
+        return;
+      }
+
+      if (currentPIN === CORRECT_PIN) {
+        setStatus("Correct PIN. Access Granted ✅", "ok");
+        // Success: FSM could transition to a SUCCESS state (not needed for demo).
+        disableInteraction();
+        return;
+      }
+
+      // Wrong PIN
+      attemptsUsed++;
+      updateAttemptsView();
+
+      if (attemptsUsed === 1) {
+        setState(TRY1);
+      } else if (attemptsUsed === 2) {
+        setState(TRY2);
+      } else if (attemptsUsed >= 3) {
+        setState(LOCKED);
+      }
+
+      if (isLocked()) {
+        setStatus("Wrong PIN. Card blocked after 3 failed attempts.", "error");
+        disableInteraction();
+      } else {
+        setStatus("Wrong PIN. Try again.", "error");
+      }
+
+      currentPIN = "";
+      updateInputDisplay();
+    }
+
+    function disableInteraction() {
+      // disable keypad and input
+      Array.from(keypad.querySelectorAll("button")).forEach(btn => {
+        btn.disabled = true;
       });
-
-      currentFloorSpan.textContent = currentFloor;
-      queueView.textContent = "Queue: [ " + requestQueue.join(", ") + " ]";
+      submitBtn.disabled = true;
+      clearBtn.disabled = true;
+      pinInput.disabled = true;
     }
 
-    function logStatus(text) {
-      statusDiv.textContent = text;
+    function enableInteraction() {
+      Array.from(keypad.querySelectorAll("button")).forEach(btn => {
+        btn.disabled = false;
+      });
+      submitBtn.disabled = true; // will enable when there is input
+      clearBtn.disabled = false;
+      pinInput.disabled = false;
     }
 
-    function processNextRequest() {
-      if (requestQueue.length === 0) {
-        setState(IDLE);
-        logStatus("No more requests. Elevator idle at Floor " + currentFloor + ".");
-        updateBuildingView(false);
-        return;
-      }
-
-      const targetFloor = requestQueue[0]; // peek
-      if (targetFloor === currentFloor) {
-        // Already here → open doors directly
-        arriveAtFloor();
-        return;
-      }
-
-      if (targetFloor > currentFloor) {
-        setState(MOVING_UP);
-        logStatus("Moving up from Floor " + currentFloor + " to Floor " + targetFloor + "...");
-      } else {
-        setState(MOVING_DOWN);
-        logStatus("Moving down from Floor " + currentFloor + " to Floor " + targetFloor + "...");
-      }
-
-      // Start interval to simulate moving one floor per second
-      if (moveTimer) clearInterval(moveTimer);
-      moveTimer = setInterval(() => {
-        const target = requestQueue[0];
-        if (state === MOVING_UP && currentFloor < target) {
-          currentFloor++;
-        } else if (state === MOVING_DOWN && currentFloor > target) {
-          currentFloor--;
-        }
-
-        updateBuildingView(false);
-
-        if (currentFloor === target) {
-          arriveAtFloor();
-        }
-      }, 1000);
-    }
-
-    function arriveAtFloor() {
-      if (moveTimer) {
-        clearInterval(moveTimer);
-        moveTimer = null;
-      }
-
-      const target = requestQueue.shift(); // remove served floor
-      setState(DOOR_OPEN);
-      logStatus("Arrived at Floor " + target + ". Doors opening...");
-      updateBuildingView(true);
-
-      if (doorTimer) clearTimeout(doorTimer);
-      doorTimer = setTimeout(() => {
-        logStatus("Doors closing at Floor " + currentFloor + ".");
-        updateBuildingView(false);
-        processNextRequest();
-      }, 2000); // doors stay open for 2 seconds
-    }
-
-    function addRequest(floor) {
-      if (floor === currentFloor && (state === IDLE || state === DOOR_OPEN)) {
-        logStatus("You are already at Floor " + floor + ".");
-        return;
-      }
-
-      if (!requestQueue.includes(floor)) {
-        requestQueue.push(floor);
-        logStatus("Added request for Floor " + floor + ". " +
-          (state === IDLE ? "Elevator will start moving." : "Will serve after current trip."));
-      } else {
-        logStatus("Floor " + floor + " is already in the queue.");
-      }
-
-      updateBuildingView(state === DOOR_OPEN);
-
-      if (state === IDLE) {
-        processNextRequest();
-      }
-    }
-
-    function resetElevator() {
-      if (moveTimer) clearInterval(moveTimer);
-      if (doorTimer) clearTimeout(doorTimer);
-      moveTimer = null;
-      doorTimer = null;
-
-      state = IDLE;
-      requestQueue = [];
-      currentFloor = 1;
-      setState(IDLE);
-      logStatus("Elevator reset. Idle at Floor 1.");
-      updateBuildingView(false);
+    function resetSystem() {
+      attemptsUsed = 0;
+      currentPIN = "";
+      setState(TRY0);
+      updateAttemptsView();
+      updateInputDisplay();
+      setStatus("System reset. Enter 4-digit PIN using keypad.");
+      enableInteraction();
     }
 
     // Event listeners
-    floorButtonsContainer.addEventListener("click", (e) => {
+    keypad.addEventListener("click", (e) => {
       if (e.target.tagName.toLowerCase() === "button") {
-        const floor = parseInt(e.target.dataset.floor, 10);
-        addRequest(floor);
+        const digit = e.target.dataset.digit;
+        if (!digit) return;
+        handleDigit(digit);
+        // Enable submit when there is at least 1 char
+        submitBtn.disabled = currentPIN.length === 0;
       }
     });
 
-    resetBtn.addEventListener("click", resetElevator);
+    clearBtn.addEventListener("click", () => {
+      clearPIN();
+      submitBtn.disabled = true;
+    });
 
-    // Initial render
-    setState(IDLE);
-    updateBuildingView(false);
+    submitBtn.addEventListener("click", () => {
+      evaluatePIN();
+      submitBtn.disabled = true;
+    });
+
+    resetBtn.addEventListener("click", resetSystem);
+
+    // Init
+    resetSystem();
   </script>
 </body>
 </html>
