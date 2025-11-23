@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Elevator Controller FSM Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #e5f4ff;
+      color: #0f172a;
+    }
+
+    .card {
+      background: white;
+      border-radius: 18px;
+      padding: 20px 22px 22px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 14px 40px rgba(15, 23, 42, 0.12);
+      max-width: 640px;
+      width: 100%;
+    }
+
+    .title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #475569;
+      margin-bottom: 16px;
+    }
+
+    .layout {
+      display: flex;
+      gap: 20px;
+      align-items: stretch;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    /* Building / elevator shaft */
+    .building {
+      background: #0f172a;
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 8px;
+      width: 180px;
+    }
+
+    .floor {
+      background: #020617;
+      border-radius: 10px;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid transparent;
+      transition: border 0.15s, background 0.15s;
+      color: #e5e7eb;
+      font-size: 0.8rem;
+    }
+
+    .floor-label {
+      opacity: 0.8;
+    }
+
+    .car {
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .door {
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #1f2937;
+    }
+
+    .floor.current {
+      border-color: #38bdf8;
+      background: #0b1120;
+    }
+
+    .floor.current .floor-label {
+      font-weight: 600;
+      opacity: 1;
+    }
+
+    .door.open {
+      background: #22c55e;
+      color: #052e16;
+    }
+
+    .door.closed {
+      background: #ef4444;
+      color: #450a0a;
+    }
+
+    /* Controls */
+    .side-panel {
+      flex: 1;
+      min-width: 240px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .state-label {
+      font-size: 0.9rem;
+    }
+
+    .state-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      margin-left: 4px;
+      font-size: 0.75rem;
+      border: 1px solid #cbd5e1;
+    }
+
+    .state-pill strong {
+      margin-left: 2px;
+    }
+
+    .dir-label {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    .buttons-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 4px;
+      margin-bottom: 6px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 6px 0;
+      font-size: 0.9rem;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.4);
+      transition: transform 0.09s, box-shadow 0.09s, background 0.09s;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.5);
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+    }
+
+    .reset-btn {
+      margin-top: 4px;
+      background: #0f172a;
+      box-shadow: 0 6px 14px rgba(15, 23, 42, 0.4);
+      font-size: 0.8rem;
+      padding-inline: 10px;
+      justify-self: flex-start;
+      width: auto;
+    }
+
+    .status {
+      font-size: 0.8rem;
+      color: #64748b;
+      min-height: 1.3em;
+    }
+
+    .queue {
+      font-size: 0.8rem;
+      color: #475569;
+    }
+
+    .fsm-info {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed #cbd5e1;
+      font-size: 0.75rem;
+      color: #64748b;
+      line-height: 1.35;
+    }
+
+    .fsm-info code {
+      background: #e2e8f0;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">Elevator Controller (Finite State Machine)</div>
+    <div class="subtitle">
+      States: Idle → Moving Up → Door Open → Idle, and Idle → Moving Down → Door Open → Idle, based on floor requests.
+    </div>
+
+    <div class="layout">
+      <!-- Building view -->
+      <div class="building" id="building">
+        <!-- Floors 5 to 1 (created via JS or you can hard-code) -->
+        <div class="floor" data-floor="5">
+          <span class="floor-label">Floor 5</span>
+          <span class="car">
+            🚪 <span class="door closed">Closed</span>
+          </span>
+        </div>
+        <div class="floor" data-floor="4">
+          <span class="floor-label">Floor 4</span>
+          <span class="car">
+            🚪 <span class="door closed">Closed</span>
+          </span>
+        </div>
+        <div class="floor" data-floor="3">
+          <span class="floor-label">Floor 3</span>
+          <span class="car">
+            🚪 <span class="door closed">Closed</span>
+          </span>
+        </div>
+        <div class="floor" data-floor="2">
+          <span class="floor-label">Floor 2</span>
+          <span class="car">
+            🚪 <span class="door closed">Closed</span>
+          </span>
+        </div>
+        <div class="floor" data-floor="1">
+          <span class="floor-label">Floor 1</span>
+          <span class="car">
+            🚪 <span class="door closed">Closed</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Controls / FSM info -->
+      <div class="side-panel">
+        <div class="state-label">
+          FSM state:
+          <span class="state-pill">
+            <span id="state-name">IDLE</span>
+            &nbsp;(<span id="state-id">q0</span>)
+          </span>
+        </div>
+        <div class="dir-label">
+          Current floor: <strong id="current-floor">1</strong>
+          &nbsp;| Direction: <span id="direction-text">None</span>
+        </div>
+
+        <div class="buttons-grid" id="floor-buttons">
+          <!-- Floor buttons 1–5 -->
+          <button data-floor="1">1</button>
+          <button data-floor="2">2</button>
+          <button data-floor="3">3</button>
+          <button data-floor="4">4</button>
+          <button data-floor="5">5</button>
+        </div>
+
+        <button class="reset-btn" id="resetBtn">Reset Elevator</button>
+
+        <div class="status" id="status">
+          Elevator idle at Floor 1. Press a floor button to request.
+        </div>
+        <div class="queue" id="queue-view">
+          Queue: [ ] 
+        </div>
+
+        <div class="fsm-info">
+          States: <code>{IDLE (q0), MOVING_UP (q1), MOVING_DOWN (q2), DOOR_OPEN (q3)}</code><br />
+          Inputs: <code>{floorRequest, reachedTarget, doorTimer}</code><br />
+          Example transitions:<br />
+          <code>IDLE + request above → MOVING_UP</code><br />
+          <code>IDLE + request below → MOVING_DOWN</code><br />
+          <code>MOVING_* + reachedTarget → DOOR_OPEN</code><br />
+          <code>DOOR_OPEN + timer → IDLE or next MOVING_* (if more requests)</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // FSM STATES
+    const IDLE = "IDLE";
+    const MOVING_UP = "MOVING_UP";
+    const MOVING_DOWN = "MOVING_DOWN";
+    const DOOR_OPEN = "DOOR_OPEN";
+
+    let state = IDLE;
+    let currentFloor = 1;
+    let requestQueue = []; // FIFO list of requested floors
+    let moveTimer = null;
+    let doorTimer = null;
+
+    const floors = Array.from(document.querySelectorAll(".floor"));
+    const stateNameSpan = document.getElementById("state-name");
+    const stateIdSpan = document.getElementById("state-id");
+    const directionText = document.getElementById("direction-text");
+    const currentFloorSpan = document.getElementById("current-floor");
+    const statusDiv = document.getElementById("status");
+    const queueView = document.getElementById("queue-view");
+    const floorButtonsContainer = document.getElementById("floor-buttons");
+    const resetBtn = document.getElementById("resetBtn");
+
+    function setState(newState) {
+      state = newState;
+      stateNameSpan.textContent = newState;
+
+      let id;
+      switch (newState) {
+        case IDLE: id = "q0"; break;
+        case MOVING_UP: id = "q1"; break;
+        case MOVING_DOWN: id = "q2"; break;
+        case DOOR_OPEN: id = "q3"; break;
+        default: id = "?";
+      }
+      stateIdSpan.textContent = id;
+
+      if (newState === IDLE) {
+        directionText.textContent = "None";
+      } else if (newState === MOVING_UP) {
+        directionText.textContent = "Up ↑";
+      } else if (newState === MOVING_DOWN) {
+        directionText.textContent = "Down ↓";
+      } else if (newState === DOOR_OPEN) {
+        directionText.textContent = "Stopped";
+      }
+    }
+
+    function updateBuildingView(doorIsOpen) {
+      floors.forEach(floor => {
+        const floorNum = parseInt(floor.dataset.floor, 10);
+        const doorSpan = floor.querySelector(".door");
+        floor.classList.toggle("current", floorNum === currentFloor);
+
+        if (doorSpan) {
+          if (floorNum === currentFloor && doorIsOpen) {
+            doorSpan.textContent = "Open";
+            doorSpan.classList.add("open");
+            doorSpan.classList.remove("closed");
+          } else {
+            doorSpan.textContent = "Closed";
+            doorSpan.classList.add("closed");
+            doorSpan.classList.remove("open");
+          }
+        }
+      });
+
+      currentFloorSpan.textContent = currentFloor;
+      queueView.textContent = "Queue: [ " + requestQueue.join(", ") + " ]";
+    }
+
+    function logStatus(text) {
+      statusDiv.textContent = text;
+    }
+
+    function processNextRequest() {
+      if (requestQueue.length === 0) {
+        setState(IDLE);
+        logStatus("No more requests. Elevator idle at Floor " + currentFloor + ".");
+        updateBuildingView(false);
+        return;
+      }
+
+      const targetFloor = requestQueue[0]; // peek
+      if (targetFloor === currentFloor) {
+        // Already here → open doors directly
+        arriveAtFloor();
+        return;
+      }
+
+      if (targetFloor > currentFloor) {
+        setState(MOVING_UP);
+        logStatus("Moving up from Floor " + currentFloor + " to Floor " + targetFloor + "...");
+      } else {
+        setState(MOVING_DOWN);
+        logStatus("Moving down from Floor " + currentFloor + " to Floor " + targetFloor + "...");
+      }
+
+      // Start interval to simulate moving one floor per second
+      if (moveTimer) clearInterval(moveTimer);
+      moveTimer = setInterval(() => {
+        const target = requestQueue[0];
+        if (state === MOVING_UP && currentFloor < target) {
+          currentFloor++;
+        } else if (state === MOVING_DOWN && currentFloor > target) {
+          currentFloor--;
+        }
+
+        updateBuildingView(false);
+
+        if (currentFloor === target) {
+          arriveAtFloor();
+        }
+      }, 1000);
+    }
+
+    function arriveAtFloor() {
+      if (moveTimer) {
+        clearInterval(moveTimer);
+        moveTimer = null;
+      }
+
+      const target = requestQueue.shift(); // remove served floor
+      setState(DOOR_OPEN);
+      logStatus("Arrived at Floor " + target + ". Doors opening...");
+      updateBuildingView(true);
+
+      if (doorTimer) clearTimeout(doorTimer);
+      doorTimer = setTimeout(() => {
+        logStatus("Doors closing at Floor " + currentFloor + ".");
+        updateBuildingView(false);
+        processNextRequest();
+      }, 2000); // doors stay open for 2 seconds
+    }
+
+    function addRequest(floor) {
+      if (floor === currentFloor && (state === IDLE || state === DOOR_OPEN)) {
+        logStatus("You are already at Floor " + floor + ".");
+        return;
+      }
+
+      if (!requestQueue.includes(floor)) {
+        requestQueue.push(floor);
+        logStatus("Added request for Floor " + floor + ". " +
+          (state === IDLE ? "Elevator will start moving." : "Will serve after current trip."));
+      } else {
+        logStatus("Floor " + floor + " is already in the queue.");
+      }
+
+      updateBuildingView(state === DOOR_OPEN);
+
+      if (state === IDLE) {
+        processNextRequest();
+      }
+    }
+
+    function resetElevator() {
+      if (moveTimer) clearInterval(moveTimer);
+      if (doorTimer) clearTimeout(doorTimer);
+      moveTimer = null;
+      doorTimer = null;
+
+      state = IDLE;
+      requestQueue = [];
+      currentFloor = 1;
+      setState(IDLE);
+      logStatus("Elevator reset. Idle at Floor 1.");
+      updateBuildingView(false);
+    }
+
+    // Event listeners
+    floorButtonsContainer.addEventListener("click", (e) => {
+      if (e.target.tagName.toLowerCase() === "button") {
+        const floor = parseInt(e.target.dataset.floor, 10);
+        addRequest(floor);
+      }
+    });
+
+    resetBtn.addEventListener("click", resetElevator);
+
+    // Initial render
+    setState(IDLE);
+    updateBuildingView(false);
+  </script>
+</body>
+</html>
