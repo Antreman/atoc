@@ -331,9 +331,7 @@
 
       if (attemptsUsed === 1) {
         setState(TRY1);
-      } else if (attemptsUsed === 2) {
-        setState(TRY2);
-      } else if (attemptsUsed >= 3) {
+      } else if (attemptsUsed >= 2){
         setState(LOCKED);
       }
 
