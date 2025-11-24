@@ -172,7 +172,7 @@
   <div class="card">
     <div class="title">ATM PIN Attempt System</div>
     <div class="subtitle">
-      Finite State Machine with limited tries: Try0 → Try1 → Try2 → Locked.
+      Finite State Machine with limited tries: Try0 → Try1 → Locked.
     </div>
 
     <div class="state-row">
@@ -183,8 +183,8 @@
       </span>
     </div>
     <div class="attempts">
-      Attempts used: <strong id="attempts-used">0</strong> / 3
-      &nbsp;| Remaining: <strong id="attempts-left">3</strong>
+      Attempts used: <strong id="attempts-used">0</strong> / 2
+      &nbsp;| Remaining: <strong id="attempts-left">2</strong>
     </div>
 
     <div class="pin-display">
@@ -226,7 +226,7 @@
     </div>
 
     <div class="fsm-info">
-      States: <code>{TRY0 (q0), TRY1 (q1), TRY2 (q2), LOCKED (q3)}</code><br />
+      States: <code>{TRY0 (q0), TRY1 (q1), LOCKED (q2)}</code><br />
       Inputs: <code>{correctPIN, wrongPIN}</code><br />
       Transitions:<br />
       <code>TRY0 --wrongPIN--> TRY1</code><br />
@@ -240,7 +240,6 @@
     // FSM STATE CONSTANTS
     const TRY0 = "TRY0";
     const TRY1 = "TRY1";
-    const TRY2 = "TRY2";
     const LOCKED = "LOCKED";
 
     const CORRECT_PIN = "1234"; // hard-coded for demo
